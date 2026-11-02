@@ -2,9 +2,10 @@
 OTP (One-Time Password) Manager
 
 Provides OTP generation and verification for secure authentication.
-Supports email-based OTP delivery with configurable expiry.
+Supports email-based OTP delivery with configurable expiry and local dev fallback.
 """
 
+import os
 import random
 import string
 import smtplib
@@ -56,6 +57,7 @@ class OTPManager:
         self.expiry_minutes = expiry_minutes
         self.max_attempts = max_attempts
         self._otp_store: Dict[str, OTPRecord] = {}
+        self.last_otp: Dict[str, str] = {}
     
     @staticmethod
     def _hash_otp(otp: str) -> str:
@@ -80,9 +82,11 @@ class OTPManager:
         expires_at = now + timedelta(minutes=self.expiry_minutes)
         
         # Store OTP record (hashed)
-        self._otp_store[email.lower()] = OTPRecord(
+        clean_email = email.strip().lower()
+        self.last_otp[clean_email] = otp
+        self._otp_store[clean_email] = OTPRecord(
             otp_hash=self._hash_otp(otp),
-            email=email.lower(),
+            email=clean_email,
             created_at=now,
             expires_at=expires_at,
             attempts=0,
@@ -90,6 +94,10 @@ class OTPManager:
         )
         
         return otp, expires_at
+
+    def get_last_otp(self, email: str) -> Optional[str]:
+        """Get the latest generated OTP for email (useful in dev/demo mode)."""
+        return self.last_otp.get(email.strip().lower())
     
     def verify_otp(self, email: str, otp: str) -> Tuple[bool, str]:
         """
@@ -102,7 +110,7 @@ class OTPManager:
         Returns:
             Tuple of (success, message)
         """
-        email = email.lower()
+        email = email.strip().lower()
         
         # Check if OTP exists
         if email not in self._otp_store:
@@ -117,15 +125,19 @@ class OTPManager:
         # Check if expired
         if datetime.now() > record.expires_at:
             del self._otp_store[email]
+            if email in self.last_otp:
+                del self.last_otp[email]
             return False, "OTP expired. Please request a new one."
         
         # Check attempts
         if record.attempts >= self.max_attempts:
             del self._otp_store[email]
+            if email in self.last_otp:
+                del self.last_otp[email]
             return False, "Too many failed attempts. Please request a new OTP."
         
         # Verify OTP
-        if self._hash_otp(otp) == record.otp_hash:
+        if self._hash_otp(otp.strip()) == record.otp_hash:
             record.verified = True
             return True, "OTP verified successfully!"
         else:
@@ -135,7 +147,7 @@ class OTPManager:
     
     def is_otp_valid(self, email: str) -> bool:
         """Check if there's a valid (non-expired) OTP for email."""
-        email = email.lower()
+        email = email.strip().lower()
         if email not in self._otp_store:
             return False
         
@@ -144,7 +156,7 @@ class OTPManager:
     
     def get_time_remaining(self, email: str) -> Optional[int]:
         """Get seconds remaining for OTP validity."""
-        email = email.lower()
+        email = email.strip().lower()
         if email not in self._otp_store:
             return None
         
@@ -154,16 +166,18 @@ class OTPManager:
     
     def clear_otp(self, email: str):
         """Clear OTP for email (after successful login)."""
-        email = email.lower()
+        email = email.strip().lower()
         if email in self._otp_store:
             del self._otp_store[email]
+        if email in self.last_otp:
+            del self.last_otp[email]
 
 
 class EmailOTPSender:
     """
     Send OTP via email using SMTP.
     
-    Requires SMTP configuration for email delivery.
+    Requires SMTP configuration for email delivery, with dev-mode fallback.
     """
     
     def __init__(
@@ -186,10 +200,20 @@ class EmailOTPSender:
         self.smtp_port = smtp_port
         self.sender_email = sender_email
         self.sender_password = sender_password
+
+    def is_smtp_configured(self) -> bool:
+        """Check if SMTP credentials are configured with non-dummy values."""
+        return bool(
+            self.smtp_server
+            and self.sender_email
+            and self.sender_password
+            and self.sender_password not in ("", "your-app-password")
+            and self.sender_email != "your-email@gmail.com"
+        )
     
     def send_otp_email(self, recipient_email: str, otp: str, expiry_minutes: int = 5) -> Tuple[bool, str]:
         """
-        Send OTP via email.
+        Send OTP via email. Supports automatic local fallback in dev/demo mode.
         
         Args:
             recipient_email: Recipient's email address
@@ -199,8 +223,13 @@ class EmailOTPSender:
         Returns:
             Tuple of (success, message)
         """
-        if not self.smtp_server or not self.sender_email:
-            return False, "Email service not configured. Contact administrator."
+        recipient_email = recipient_email.strip()
+        allow_dev = os.getenv("ALLOW_DEV_OTP", "True").lower() in ("true", "1", "yes")
+
+        if not self.is_smtp_configured():
+            if allow_dev:
+                return True, f"[DEV_MODE] OTP generated: {otp}"
+            return False, "Email service not configured. Set SMTP_EMAIL and SMTP_PASSWORD in .env."
         
         try:
             # Create email message
@@ -250,7 +279,7 @@ class EmailOTPSender:
             msg.attach(MIMEText(html_content, 'html'))
             
             # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
+            with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=15) as server:
                 server.starttls()
                 server.login(self.sender_email, self.sender_password)
                 server.send_message(msg)
@@ -258,12 +287,20 @@ class EmailOTPSender:
             return True, f"OTP sent to {recipient_email}"
             
         except smtplib.SMTPAuthenticationError:
+            if allow_dev:
+                return True, f"[DEV_MODE] (SMTP auth failed) OTP generated: {otp}"
             return False, "Email authentication failed. Check credentials."
         except smtplib.SMTPException as e:
+            if allow_dev:
+                return True, f"[DEV_MODE] (SMTP error) OTP generated: {otp}"
             return False, f"Failed to send email: {str(e)}"
         except OSError as e:
+            if allow_dev:
+                return True, f"[DEV_MODE] (Network error) OTP generated: {otp}"
             return False, f"Network error: {str(e)}. Check internet connection."
         except Exception as e:
+            if allow_dev:
+                return True, f"[DEV_MODE] OTP generated: {otp}"
             return False, f"Error: {str(e)}"
 
 

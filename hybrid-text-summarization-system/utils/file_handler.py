@@ -42,6 +42,12 @@ class FileHandler:
         Returns:
             Dictionary with extracted text and metadata
         """
+        if hasattr(file, 'seek') and callable(file.seek):
+            try:
+                file.seek(0)
+            except Exception:
+                pass
+
         if isinstance(file, str):
             filename = file
             if not os.path.exists(file):
@@ -98,6 +104,11 @@ class FileHandler:
                     pages = self._extract_pdf_pages(reader)
             else:
                 # Handle file-like object
+                if hasattr(file, 'seek') and callable(file.seek):
+                    try:
+                        file.seek(0)
+                    except Exception:
+                        pass
                 reader = PyPDF2.PdfReader(file)
                 pages = self._extract_pdf_pages(reader)
             
@@ -204,26 +215,96 @@ class FileHandler:
         return sorted(pages), None
     
     @staticmethod
-    def get_pages_text(pages: list, selected_page_numbers: list) -> str:
+    def identify_repeated_headers_footers(pages: list, min_occurrence: int = 3) -> set:
         """
-        Build the text for only the selected pages, in page order.
+        Detect running headers and footers that repeat across multiple pages.
+        Normalizes lines by stripping numbers/page counters to catch variants like 'Page | 13'.
+        """
+        import re
+        from collections import Counter
         
-        Args:
-            pages: The page-level structure returned by extract_text() for a PDF,
-                   e.g. [{"page_number": 1, "text": "..."}, ...].
-            selected_page_numbers: Page numbers to include.
+        normalized_counts = Counter()
+        raw_to_norm = {}
         
-        Returns:
-            Concatenated text from only the selected pages. Unselected pages'
-            text is never included.
+        for p in pages:
+            lines = [l.strip() for l in p.get("text", "").splitlines() if l.strip()]
+            if not lines:
+                continue
+            # Look at candidate header lines (top 4) and footer lines (bottom 4)
+            candidates = set(lines[:4] + lines[-4:])
+            for line in candidates:
+                # Normalize line: remove digits, punctuation, collapse whitespace
+                norm = re.sub(r'\d+', '', line).lower()
+                norm = re.sub(r'\s+', ' ', norm).strip()
+                if len(norm) > 10:  # Only meaningful phrases
+                    normalized_counts[norm] += 1
+                    raw_to_norm[line] = norm
+                    
+        threshold = max(min_occurrence, int(len(pages) * 0.25))
+        repeated_norms = {norm for norm, count in normalized_counts.items() if count >= threshold}
+        
+        # Return exact lines that map to repeated patterns
+        repeated_lines = {raw for raw, norm in raw_to_norm.items() if norm in repeated_norms}
+        return repeated_lines
+
+    @staticmethod
+    def clean_text_content(text: str, repeated_lines: set = None, remove_toc_dots: bool = True) -> str:
+        """Clean page text by stripping repeated headers/footers, TOC dots, and standalone page numbers."""
+        import re
+        if not text:
+            return ""
+        lines = text.splitlines()
+        cleaned = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # Standalone page numbers or "Page | 12"
+            if re.match(r'^(page\s*\|?\s*\d+|\bpage\s+\d+(\s+of\s+\d+)?|\d+)$', stripped, re.IGNORECASE):
+                continue
+            # TOC dot leaders (e.g., Figure 4.1 ... 27)
+            if remove_toc_dots and re.search(r'\.{3,}\s*\d+$', stripped):
+                continue
+            # Repeated headers/footers
+            if repeated_lines and stripped in repeated_lines:
+                continue
+            if repeated_lines:
+                norm = re.sub(r'\d+', '', stripped).lower()
+                norm = re.sub(r'\s+', ' ', norm).strip()
+                if any(norm == re.sub(r'\d+', '', r).lower().strip() for r in repeated_lines):
+                    continue
+            cleaned.append(stripped)
+        return '\n'.join(cleaned)
+
+    @staticmethod
+    def get_pages_dict(pages: list, selected_page_numbers: list, clean_noise: bool = True) -> dict:
+        """
+        Returns a dictionary mapping {page_num: page_text} for selected pages.
         """
         selected_set = set(selected_page_numbers)
-        text_parts = []
+        repeated = FileHandler.identify_repeated_headers_footers(pages) if clean_noise and len(pages) >= 3 else set()
+        
+        result = {}
         for page in pages:
-            if page.get("page_number") in selected_set:
-                page_text = page.get("text", "")
-                if page_text and page_text.strip():
-                    text_parts.append(page_text)
+            num = page.get("page_number")
+            if num in selected_set:
+                raw_text = page.get("text", "")
+                if clean_noise:
+                    cleaned = FileHandler.clean_text_content(raw_text, repeated)
+                    result[num] = cleaned if cleaned else raw_text
+                else:
+                    result[num] = raw_text
+        return result
+
+    @staticmethod
+    def get_pages_text(pages: list, selected_page_numbers: list, clean_noise: bool = True) -> str:
+        """
+        Build the text for only the selected pages, in page order.
+        Strips repetitive headers/footers when clean_noise=True so summarization
+        reflects genuine content rather than boilerplate.
+        """
+        pages_dict = FileHandler.get_pages_dict(pages, selected_page_numbers, clean_noise=clean_noise)
+        text_parts = [text for num, text in sorted(pages_dict.items()) if text and text.strip()]
         return '\n\n'.join(text_parts)
     
     @staticmethod

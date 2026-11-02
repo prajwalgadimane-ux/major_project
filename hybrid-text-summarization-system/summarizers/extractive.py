@@ -598,14 +598,35 @@ class AdvancedSummarizer:
         
         return scores
     
+    def _is_noise_sentence(self, sentence: str) -> bool:
+        """Check if sentence is boilerplate noise (TOC, running header, dots)."""
+        import re
+        s = sentence.strip()
+        if not s:
+            return True
+        # TOC / List of figures / tables line with dots
+        if re.search(r'\.{3,}\s*\d+', s):
+            return True
+        # Standalone page numbering or 'Page | 13'
+        if re.match(r'^(page\s*\|?\s*\d+|\bpage\s+\d+(\s+of\s+\d+)?|\d+)$', s, re.IGNORECASE):
+            return True
+        # Repeated running header pattern with Page |
+        if re.search(r'\bpage\s*\|\s*\d+', s, re.IGNORECASE):
+            return True
+        return False
+
     def _filter_by_length(self, sentences: List[str]) -> Tuple[List[str], List[int]]:
-        """Filter sentences by length criteria."""
+        """Filter sentences by length criteria and exclude boilerplate noise."""
         filtered, indices = [], []
         for i, sent in enumerate(sentences):
+            if self._is_noise_sentence(sent):
+                continue
             word_count = len(sent.split())
             if self.min_sentence_words <= word_count <= self.max_sentence_words * 1.5:
                 filtered.append(sent)
                 indices.append(i)
+        if not filtered and sentences:
+            return sentences, list(range(len(sentences)))
         return filtered, indices
     
     # =========================================

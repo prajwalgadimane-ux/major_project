@@ -199,7 +199,9 @@ def generate_speech(text, language='en'):
 
 
 def display_statistics(original_text, summary_text):
-    """Display summary statistics."""
+    """Display summary statistics with comparative chart and reduction visual."""
+    import pandas as pd
+
     original_words = len(original_text.split())
     summary_words = len(summary_text.split())
     compression = ((original_words - summary_words) / original_words * 100) if original_words > 0 else 0
@@ -212,7 +214,7 @@ def display_statistics(original_text, summary_text):
         if w.strip(".,!?;:\"'()[]{}")
     })
 
-    # Additional detailed stats panel (keeps existing stats unchanged)
+    # Detailed stats panel
     with st.expander("📊 Summary Statistics", expanded=True):
         stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
         with stat_col1:
@@ -225,18 +227,27 @@ def display_statistics(original_text, summary_text):
             st.metric("Unique Words", f"{unique_words:,}")
     
     col1, col2, col3, col4 = st.columns(4)
-    
     with col1:
         st.metric("Original Words", f"{original_words:,}")
-    
     with col2:
         st.metric("Summary Words", f"{summary_words:,}")
-    
     with col3:
         st.metric("Compression", f"{compression:.1f}%")
-    
     with col4:
-        st.metric("Reduction", f"{original_words - summary_words:,} words")
+        st.metric("Reduction", f"{max(0, original_words - summary_words):,} words")
+
+    # Visual Comparison Graph
+    st.markdown("##### 📈 Original vs Summary Word Count")
+    chart_df = pd.DataFrame({
+        "Document Part": ["Original Text", "Summary"],
+        "Word Count": [original_words, summary_words]
+    })
+    st.bar_chart(chart_df.set_index("Document Part"), color="#3b82f6")
+
+    # Visual Reduction Progress Bar
+    reduction_ratio = max(0.0, min(100.0, compression))
+    st.markdown(f"**Document Reduction:** `{reduction_ratio:.1f}%` compressed")
+    st.progress(reduction_ratio / 100.0)
 
 
 def display_rouge_scores(summary_text, original_text):
@@ -396,11 +407,11 @@ def _render_quality_gauge(score: float):
         <path d="M 200 63 A 100 100 0 0 1 250 150" fill="none" stroke="#22c55e" stroke-width="22" stroke-linecap="round"/>
         <line x1="150" y1="150" x2="{needle_x:.1f}" y2="{needle_y:.1f}" stroke="{score_color}" stroke-width="6" stroke-linecap="round"/>
         <circle cx="150" cy="150" r="12" fill="{score_color}" stroke="#ffffff" stroke-width="4"/>
-        <text x="150" y="115" text-anchor="middle" font-size="34" font-weight="700" fill="#111827">{score:.1f}</text>
-        <text x="150" y="138" text-anchor="middle" font-size="14" fill="#6b7280">Quality Score</text>
-        <text x="64" y="176" text-anchor="middle" font-size="12" fill="#6b7280">Low</text>
-        <text x="150" y="176" text-anchor="middle" font-size="12" fill="#6b7280">Medium</text>
-        <text x="236" y="176" text-anchor="middle" font-size="12" fill="#6b7280">High</text>
+        <text x="150" y="115" text-anchor="middle" font-size="34" font-weight="700" fill="#f8fafc">{score:.1f}</text>
+        <text x="150" y="138" text-anchor="middle" font-size="14" font-weight="600" fill="#94a3b8">Quality Score</text>
+        <text x="64" y="176" text-anchor="middle" font-size="12" font-weight="600" fill="#ef4444">Low</text>
+        <text x="150" y="176" text-anchor="middle" font-size="12" font-weight="600" fill="#f59e0b">Medium</text>
+        <text x="236" y="176" text-anchor="middle" font-size="12" font-weight="600" fill="#22c55e">High</text>
       </svg>
     </div>
     """
@@ -470,15 +481,18 @@ def display_evaluation_dashboard(original_text, summary_text, method_label="Extr
 
             c1, c2, c3 = st.columns(3)
 
+            card_style = "padding: 14px 16px; border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 12px; background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
+            label_style = "font-size: 0.85rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;"
+
             with c1:
                 st.markdown("#### 📊 Compression")
                 st.markdown(
                     f"""
-                    <div style="padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fafafa;">
-                        <div style="font-size: 0.85rem; color: #6b7280;">Compression Ratio</div>
-                        <div style="font-size: 1.6rem; font-weight: 700; margin-bottom: 8px;">{compression_ratio:.2f}x</div>
-                        <div style="font-size: 0.85rem; color: #6b7280;">Reduction</div>
-                        <div style="font-size: 1.35rem; font-weight: 650;">{reduction_pct:.1f}%</div>
+                    <div style="{card_style}">
+                        <div style="{label_style}">Compression Ratio</div>
+                        <div style="font-size: 1.7rem; font-weight: 800; color: #38bdf8; margin-bottom: 10px;">{compression_ratio:.2f}x</div>
+                        <div style="{label_style}">Reduction</div>
+                        <div style="font-size: 1.4rem; font-weight: 750; color: #4ade80;">{reduction_pct:.1f}%</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -488,11 +502,11 @@ def display_evaluation_dashboard(original_text, summary_text, method_label="Extr
                 st.markdown("#### 📖 Coverage")
                 st.markdown(
                     f"""
-                    <div style="padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fafafa;">
-                        <div style="font-size: 0.85rem; color: #6b7280;">Word Coverage</div>
-                        <div style="font-size: 1.6rem; font-weight: 700; margin-bottom: 8px;">{coverage_pct:.1f}%</div>
-                        <div style="font-size: 0.85rem; color: #6b7280;">Novelty Ratio</div>
-                        <div style="font-size: 1.35rem; font-weight: 650;">{novelty_pct:.1f}%</div>
+                    <div style="{card_style}">
+                        <div style="{label_style}">Word Coverage</div>
+                        <div style="font-size: 1.7rem; font-weight: 800; color: #818cf8; margin-bottom: 10px;">{coverage_pct:.1f}%</div>
+                        <div style="{label_style}">Novelty Ratio</div>
+                        <div style="font-size: 1.4rem; font-weight: 750; color: #f472b6;">{novelty_pct:.1f}%</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -502,11 +516,11 @@ def display_evaluation_dashboard(original_text, summary_text, method_label="Extr
                 st.markdown("#### ✏️ Readability")
                 st.markdown(
                     f"""
-                    <div style="padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fafafa;">
-                        <div style="font-size: 0.85rem; color: #6b7280;">Flesch Score</div>
-                        <div style="font-size: 1.6rem; font-weight: 700; margin-bottom: 8px;">{readability_score:.1f}</div>
-                        <div style="font-size: 0.85rem; color: #6b7280;">Avg Sentence Length</div>
-                        <div style="font-size: 1.35rem; font-weight: 650;">{avg_sentence_length:.1f}</div>
+                    <div style="{card_style}">
+                        <div style="{label_style}">Flesch Score</div>
+                        <div style="font-size: 1.7rem; font-weight: 800; color: #fbbf24; margin-bottom: 10px;">{readability_score:.1f}</div>
+                        <div style="{label_style}">Avg Sentence Length</div>
+                        <div style="font-size: 1.4rem; font-weight: 750; color: #a78bfa;">{avg_sentence_length:.1f} words</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -844,7 +858,8 @@ def main():
                                 if page_error:
                                     st.error(f"❌ {page_error}")
                                 else:
-                                    page_text = FileHandler.get_pages_text(pages, selected_pages)
+                                    pages_dict = FileHandler.get_pages_dict(pages, selected_pages, clean_noise=True)
+                                    page_text = FileHandler.get_pages_text(pages, selected_pages, clean_noise=True)
                                     pages_display = FileHandler.format_page_list(selected_pages)
                                     
                                     if not page_text.strip():
@@ -852,10 +867,47 @@ def main():
                                     else:
                                         input_text = page_text
                                         scope_label = f"Pages {pages_display}"
-                                        st.success(f"✅ Selected page(s): {pages_display}")
+                                        st.success(f"✅ Selected page(s): {pages_display} ({len(page_text.split()):,} words extracted)")
                                         
-                                        with st.expander("Preview selected pages text"):
-                                            st.text_area("Selected Text", input_text[:2000] + "..." if len(input_text) > 2000 else input_text, height=200, disabled=True)
+                                        clean_preview_key = re.sub(r'[^a-zA-Z0-9_]', '_', page_input)
+                                        with st.expander("Preview selected pages text", expanded=False):
+                                            if len(selected_pages) > 1:
+                                                p_mode = st.radio(
+                                                    "Preview display:",
+                                                    ["📄 Page by Page", "📑 Combined Text"],
+                                                    horizontal=True,
+                                                    key=f"prev_mode_{clean_preview_key}"
+                                                )
+                                                if p_mode == "📄 Page by Page":
+                                                    chosen_p = st.selectbox(
+                                                        "View Page:",
+                                                        options=selected_pages,
+                                                        format_func=lambda p: f"Page {p} ({len(pages_dict.get(p, '').split())} words)",
+                                                        key=f"prev_sel_{clean_preview_key}"
+                                                    )
+                                                    st.text_area(
+                                                        f"Page {chosen_p} Text",
+                                                        value=pages_dict.get(chosen_p, ""),
+                                                        height=220,
+                                                        disabled=True,
+                                                        key=f"prev_val_{clean_preview_key}_{chosen_p}"
+                                                    )
+                                                else:
+                                                    st.text_area(
+                                                        f"All Selected Pages ({pages_display})",
+                                                        value=page_text,
+                                                        height=220,
+                                                        disabled=True,
+                                                        key=f"prev_val_all_{clean_preview_key}"
+                                                    )
+                                            else:
+                                                st.text_area(
+                                                    f"Page {selected_pages[0]} Text",
+                                                    value=page_text,
+                                                    height=220,
+                                                    disabled=True,
+                                                    key=f"prev_val_single_{clean_preview_key}"
+                                                )
                             elif generate_clicked:
                                 st.error("❌ Please enter at least one page number before generating the summary (e.g. 2, 2,5,8, or 3-7).")
                             
@@ -1301,6 +1353,24 @@ EXTRACTED KEYWORDS: {', '.join(advanced_result.get('keywords', [])[:10])}
                 download_text = abstractive_result["summary"]
             else:
                 download_text = abstractive_result["summary"] if abstractive_result else ""
+
+            # Determine clean summary text strictly for audio reading (no headers/footers)
+            if method == "Advanced (All Algorithms)":
+                clean_spoken_summary = advanced_result["summary"]
+            elif method == "Extractive (TF-IDF)":
+                clean_spoken_summary = tfidf_result["summary"]
+            elif method == "Extractive (TextRank)":
+                clean_spoken_summary = textrank_result["summary"]
+            elif method == "K-Means Clustering":
+                clean_spoken_summary = kmeans_result["summary"]
+            elif method == "Semantic (SBERT)":
+                clean_spoken_summary = sbert_result["summary"]
+            elif method == "Abstractive (AI)":
+                clean_spoken_summary = abstractive_result["summary"]
+            elif method == "Compare All":
+                clean_spoken_summary = advanced_result["summary"] if advanced_result else (tfidf_result["summary"] if tfidf_result else "")
+            else:
+                clean_spoken_summary = download_text
             
             # Download section - All three formats available at once
             st.subheader("📥 Download Summary")
@@ -1440,23 +1510,29 @@ EXTRACTED KEYWORDS: {', '.join(advanced_result.get('keywords', [])[:10])}
                     generate_audio_btn = st.button("🔊 Generate Audio", use_container_width=True, key="tts_btn")
                 
                 if generate_audio_btn:
-                    with st.spinner("Generating audio..."):
-                        tts_result = generate_speech(download_text, effective_tts_language)
-                    
-                    if tts_result['success']:
-                        audio_format = tts_result.get('audio_format', 'mp3')
-                        mime_type = 'audio/wav' if audio_format == 'wav' else 'audio/mp3'
-                        st.success("✅ Audio generated successfully")
-                        st.audio(tts_result['audio_data'], format=mime_type)
-                        st.download_button(
-                            label=f"📥 Download Audio ({audio_format.upper()})",
-                            data=tts_result['audio_data'],
-                            file_name=f"summary_audio.{audio_format}",
-                            mime=mime_type,
-                            key="download_audio_btn"
-                        )
-                    else:
-                        st.error(f"❌ {tts_result['error']}")
+                    with st.spinner("Generating audio for summary..."):
+                        # Speak clean summary text rather than the template formatting
+                        summary_to_speak = clean_spoken_summary if 'clean_spoken_summary' in locals() and clean_spoken_summary else download_text
+                        tts_res = generate_speech(summary_to_speak, effective_tts_language)
+                        if tts_res['success']:
+                            st.session_state['active_tts_result'] = tts_res
+                            st.session_state['active_tts_summary'] = summary_to_speak
+                        else:
+                            st.error(f"❌ {tts_res['error']}")
+                
+                active_tts = st.session_state.get('active_tts_result')
+                if active_tts and active_tts.get('success'):
+                    audio_format = active_tts.get('audio_format', 'mp3')
+                    mime_type = 'audio/wav' if audio_format == 'wav' else 'audio/mp3'
+                    st.success("✅ Audio generated successfully")
+                    st.audio(active_tts['audio_data'], format=mime_type)
+                    st.download_button(
+                        label=f"📥 Download Audio ({audio_format.upper()})",
+                        data=active_tts['audio_data'],
+                        file_name=f"summary_audio.{audio_format}",
+                        mime=mime_type,
+                        key="download_audio_btn"
+                    )
 
 
 # Sample text for demo

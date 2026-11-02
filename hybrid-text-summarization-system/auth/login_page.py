@@ -569,17 +569,23 @@ def render_login_page():
                     
                     with col1:
                         if st.button("📤 Send OTP", use_container_width=True, key="send_otp_btn"):
-                            if not email_input:
+                            clean_email = email_input.strip().lower() if email_input else ""
+                            import re
+                            if not clean_email:
                                 st.markdown('<div class="error-msg">❌ Please enter your email</div>', unsafe_allow_html=True)
-                            elif not auth.email_exists(email_input):
-                                st.markdown('<div class="error-msg">❌ Email not registered. Please sign up first.</div>', unsafe_allow_html=True)
+                            elif clean_email.endswith(".conm"):
+                                st.markdown('<div class="error-msg">⚠️ Did you mean <b>.com</b> instead of <b>.conm</b>? Please check your email address.</div>', unsafe_allow_html=True)
+                            elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", clean_email):
+                                st.markdown('<div class="error-msg">❌ Please enter a valid email address (e.g. user@example.com)</div>', unsafe_allow_html=True)
+                            elif not auth.email_exists(clean_email):
+                                st.markdown('<div class="error-msg">❌ Email not registered. Please sign up first using the <b>✨ Sign Up</b> tab above.</div>', unsafe_allow_html=True)
                             else:
                                 # Generate and send OTP
-                                otp, _ = otp_mgr.generate_otp(email_input)
-                                success, msg = email_sender.send_otp_email(email_input, otp, 5)
+                                otp, _ = otp_mgr.generate_otp(clean_email)
+                                success, msg = email_sender.send_otp_email(clean_email, otp, 5)
                                 
                                 if success:
-                                    st.session_state.otp_email = email_input
+                                    st.session_state.otp_email = clean_email
                                     st.session_state.otp_sent_time = time.time()
                                     st.session_state.otp_login_step = 2
                                     st.rerun()
@@ -603,6 +609,10 @@ def render_login_page():
                         st.rerun()
                     
                     st.markdown(f"**📧 OTP sent to:** `{st.session_state.otp_email}`")
+                    if not email_sender.is_smtp_configured():
+                        dev_otp = otp_mgr.get_last_otp(st.session_state.otp_email)
+                        if dev_otp:
+                            st.info(f"💡 **Demo / Dev Mode Active**: Your OTP is **`{dev_otp}`** (SMTP not configured). You can enter this OTP below.")
                     
                     # Real-time countdown timer (display only, no auto-refresh)
                     time_remaining = otp_mgr.get_time_remaining(st.session_state.otp_email)
