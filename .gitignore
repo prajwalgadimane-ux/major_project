@@ -1,0 +1,66 @@
+# ============================================
+# Git Ignore for Major Project (Summarix AI)
+# ============================================
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables & secrets (keep .env.example)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE & Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Generated model downloads and audio outputs
+summary.txt
+summary.pdf
+summary.docx
+summary_audio.*
+*.mp3
+*.wav
+
+# User database and local data
+data/users.json
+data/db/
+*.sqlite3
+*.db
+
+# Streamlit local settings & secrets
+.streamlit/secrets.toml
+
+# HuggingFace, Transformers & Torch caches
+.cache/
+hf_cache/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary and state directories
+state/
+tmp/
+temp/
+*.tmp
+*.temp
+

@@ -2,14 +2,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
 
 # Virtual environment
 venv/
 env/
+.venv/
 .env/
 
 # Environment variables (contains secrets)
 .env
+.env.local
+!.env.example
 
 # IDE
 .vscode/
@@ -31,14 +36,24 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Model cache (can be large)
+# Model cache & Streamlit secrets
 .cache/
+.streamlit/secrets.toml
+
+# Generated audio and export files
+*.mp3
+*.wav
+summary_audio.*
+summary.txt
+summary.pdf
+summary.docx
 
 # Temporary files
 *.tmp
 *.temp
 
-# Local app data
+# Local app data & fallback users
 data/db/
 data/users.json

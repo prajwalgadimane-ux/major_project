@@ -4,7 +4,14 @@ A comprehensive text summarization tool using both extractive and abstractive me
 """
 
 import os
+import sys
 import re
+
+# Ensure the application directory is always in sys.path
+_app_dir = os.path.dirname(os.path.abspath(__file__))
+if _app_dir not in sys.path:
+    sys.path.insert(0, _app_dir)
+
 # Set environment variable for Keras 3 compatibility BEFORE importing transformers
 os.environ['TF_USE_LEGACY_KERAS'] = '1'
 

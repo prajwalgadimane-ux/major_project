@@ -51,13 +51,19 @@ class MongoDB:
             True if connection successful, False otherwise
         """
         try:
+            use_mongo = os.getenv("USE_MONGODB", "auto").lower()
+            if use_mongo in ("false", "0", "no"):
+                self._client = None
+                self._db = None
+                return False
+
             mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
             db_name = os.getenv("MONGO_DB_NAME", "text_summarizer")
             
             self._client = MongoClient(
                 mongo_uri,
-                serverSelectionTimeoutMS=5000,
-                connectTimeoutMS=5000
+                serverSelectionTimeoutMS=1500,
+                connectTimeoutMS=1500
             )
             
             # Test connection
@@ -70,8 +76,8 @@ class MongoDB:
             print(f"[OK] Connected to MongoDB: {db_name}")
             return True
             
-        except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-            print(f"[ERROR] MongoDB connection failed: {e}")
+        except (ConnectionFailure, ServerSelectionTimeoutError, OSError) as e:
+            print(f"[INFO] MongoDB offline ({mongo_uri}). Seamlessly using JSON fallback storage.")
             self._client = None
             self._db = None
             return False

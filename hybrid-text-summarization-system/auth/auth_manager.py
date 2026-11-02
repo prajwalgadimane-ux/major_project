@@ -73,10 +73,10 @@ class AuthManager:
                     self._migrate_json_users_to_mongodb()
                 else:
                     self.use_mongodb = False
-                    print("[WARN] MongoDB not connected, using JSON fallback")
+                    print("[INFO] AuthManager active using JSON storage (data/users.json)")
             except Exception as e:
                 self.use_mongodb = False
-                print(f"[WARN] MongoDB error: {e}, using JSON fallback")
+                print(f"[INFO] AuthManager using JSON storage fallback")
     
     def _load_users(self):
         """Load users from JSON storage file."""
