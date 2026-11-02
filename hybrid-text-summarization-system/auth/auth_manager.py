@@ -69,14 +69,14 @@ class AuthManager:
                 self.db = get_db()
                 if self.db.is_connected:
                     self.user_repo = get_user_repository()
-                    print("✅ AuthManager using MongoDB")
+                    print("[OK] AuthManager using MongoDB")
                     self._migrate_json_users_to_mongodb()
                 else:
                     self.use_mongodb = False
-                    print("⚠️ MongoDB not connected, using JSON fallback")
+                    print("[WARN] MongoDB not connected, using JSON fallback")
             except Exception as e:
                 self.use_mongodb = False
-                print(f"⚠️ MongoDB error: {e}, using JSON fallback")
+                print(f"[WARN] MongoDB error: {e}, using JSON fallback")
     
     def _load_users(self):
         """Load users from JSON storage file."""
@@ -100,10 +100,10 @@ class AuthManager:
                 self.db = db
                 self.user_repo = get_user_repository()
                 self.use_mongodb = True
-                print("✅ AuthManager switched to MongoDB")
+                print("[OK] AuthManager switched to MongoDB")
                 self._migrate_json_users_to_mongodb()
         except Exception as e:
-            print(f"⚠️ MongoDB reconnect failed: {e}")
+            print(f"[WARN] MongoDB reconnect failed: {e}")
 
     def _migrate_json_users_to_mongodb(self):
         """Migrate JSON fallback users to MongoDB once connection is available."""
@@ -122,7 +122,7 @@ class AuthManager:
                 migrated += 1
 
         if migrated:
-            print(f"✅ Migrated {migrated} users from JSON to MongoDB")
+            print(f"[OK] Migrated {migrated} users from JSON to MongoDB")
     
     def _save_users(self):
         """Save users to JSON storage file."""

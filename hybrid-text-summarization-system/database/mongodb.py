@@ -67,11 +67,11 @@ class MongoDB:
             # Create indexes
             self._create_indexes()
             
-            print(f"✅ Connected to MongoDB: {db_name}")
+            print(f"[OK] Connected to MongoDB: {db_name}")
             return True
             
         except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-            print(f"❌ MongoDB connection failed: {e}")
+            print(f"[ERROR] MongoDB connection failed: {e}")
             self._client = None
             self._db = None
             return False
