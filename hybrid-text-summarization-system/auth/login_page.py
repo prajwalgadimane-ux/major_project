@@ -5,6 +5,7 @@ Beautiful, modern authentication UI with OTP-based real-time verification.
 
 import os
 import streamlit as st
+import streamlit.components.v1 as components
 import time
 from dotenv import load_dotenv
 from auth import AuthManager
@@ -445,6 +446,16 @@ def render_login_page():
             sender_email=os.getenv("SMTP_EMAIL", ""),
             sender_password=os.getenv("SMTP_PASSWORD", "")
         )
+    else:
+        # Keep sender in sync with .env
+        load_dotenv(override=True)
+        st.session_state.email_sender.sender_email = os.getenv("SMTP_EMAIL", st.session_state.email_sender.sender_email)
+        st.session_state.email_sender.sender_password = os.getenv("SMTP_PASSWORD", st.session_state.email_sender.sender_password)
+        st.session_state.email_sender.smtp_server = os.getenv("SMTP_SERVER", st.session_state.email_sender.smtp_server)
+        try:
+            st.session_state.email_sender.smtp_port = int(os.getenv("SMTP_PORT", str(st.session_state.email_sender.smtp_port)))
+        except ValueError:
+            pass
     
     # Initialize OTP login state
     if 'otp_login_step' not in st.session_state:
@@ -609,20 +620,58 @@ def render_login_page():
                         st.rerun()
                     
                     st.markdown(f"**📧 OTP sent to:** `{st.session_state.otp_email}`")
-                    if not email_sender.is_smtp_configured():
-                        dev_otp = otp_mgr.get_last_otp(st.session_state.otp_email)
-                        if dev_otp:
-                            st.info(f"💡 **Demo / Dev Mode Active**: Your OTP is **`{dev_otp}`** (SMTP not configured). You can enter this OTP below.")
+
+                                        
                     
-                    # Real-time countdown timer (display only, no auto-refresh)
+
+                    
+                    # Real-time ticking countdown timer
                     time_remaining = otp_mgr.get_time_remaining(st.session_state.otp_email)
                     if time_remaining is not None and time_remaining > 0:
-                        timer_class = "timer-box"
-                        st.markdown(f"""
-                            <div class="{timer_class}">
-                                ⏱️ OTP expires in: {format_time_remaining(time_remaining)}
+                        rem_secs = int(time_remaining)
+                        timer_widget = f"""
+                        <div style="display:flex; justify-content:center; align-items:center; width:100%; margin:2px 0;">
+                            <div id="otp-timer-box" style="
+                                background: linear-gradient(135deg, #f093fb, #f5576c);
+                                color: white;
+                                padding: 9px 24px;
+                                border-radius: 25px;
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                font-weight: 700;
+                                font-size: 1.15rem;
+                                text-align: center;
+                                box-shadow: 0 4px 15px rgba(245, 87, 108, 0.35);
+                                display: inline-block;
+                                transition: all 0.3s ease;
+                            ">
+                                ⏱️ OTP expires in: <span id="countdown-val">{format_time_remaining(rem_secs)}</span>
                             </div>
-                        """, unsafe_allow_html=True)
+                        </div>
+                        <script>
+                            (function() {{
+                                let remaining = {rem_secs};
+                                const badge = document.getElementById('otp-timer-box');
+                                const display = document.getElementById('countdown-val');
+                                function pad(n) {{ return (n < 10 ? '0' : '') + n; }}
+                                const timer = setInterval(function() {{
+                                    remaining--;
+                                    if (remaining <= 0) {{
+                                        clearInterval(timer);
+                                        if (badge) {{
+                                            badge.style.background = 'linear-gradient(135deg, #bdc3c7, #95a5a6)';
+                                            badge.style.boxShadow = 'none';
+                                            badge.innerHTML = '⏱️ OTP Expired - Click Resend OTP';
+                                        }}
+                                    }} else if (display) {{
+                                        const m = Math.floor(remaining / 60);
+                                        const s = remaining % 60;
+                                        display.innerText = pad(m) + ':' + pad(s);
+                                    }}
+                                }}, 1000);
+                            }})();
+                        </script>
+                        """
+                        components.html(timer_widget, height=54)
                     else:
                         st.markdown("""
                             <div class="timer-box timer-expired">

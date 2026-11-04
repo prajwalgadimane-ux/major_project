@@ -16,6 +16,7 @@ if _app_dir not in sys.path:
 os.environ['TF_USE_LEGACY_KERAS'] = '1'
 
 import streamlit as st
+import streamlit.components.v1 as components
 import time
 from io import BytesIO
 
@@ -37,7 +38,7 @@ THEME_STYLES = {
     :root { --accent-color: #1E88E5; }
     .main-header { font-size: 2.5rem; font-weight: bold; color: #1E88E5; text-align: center; margin-bottom: 1rem; }
     .sub-header { font-size: 1.2rem; color: #666; text-align: center; margin-bottom: 2rem; }
-    .summary-box { background-color: #f0f7ff; padding: 20px; border-radius: 10px; border-left: 5px solid #1E88E5; }
+    .summary-box { background: rgba(15, 23, 42, 0.88); color: #f8fafc !important; padding: 22px 24px; border-radius: 12px; border-left: 5px solid #1E88E5; border: 1px solid rgba(148, 163, 184, 0.25); box-shadow: 0 4px 16px rgba(0,0,0,0.25); font-size: 1.05rem; line-height: 1.7; }
     .stats-card { background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
     .stButton>button { width: 100%; background-color: #1E88E5; color: white; }
     """,
@@ -46,7 +47,7 @@ THEME_STYLES = {
     .stApp { background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 55%, #f5f3ff 100%); }
     .main-header { font-size: 2.7rem; font-weight: 800; text-align: center; margin-bottom: 0.7rem; color: #4f46e5; letter-spacing: -0.5px; }
     .sub-header { font-size: 1.1rem; color: #64748b; text-align: center; margin-bottom: 1.5rem; }
-    .summary-box { background: rgba(255,255,255,0.72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 20px; border-radius: 14px; border: 1px solid rgba(148,163,184,0.2); box-shadow: 0 8px 24px rgba(99,102,241,0.08); }
+    .summary-box { background: rgba(15, 23, 42, 0.88); color: #f8fafc !important; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 22px 24px; border-radius: 14px; border-left: 5px solid #6366F1; border: 1px solid rgba(148,163,184,0.25); box-shadow: 0 8px 24px rgba(99,102,241,0.12); font-size: 1.05rem; line-height: 1.7; }
     .stats-card { background: rgba(255,255,255,0.78); backdrop-filter: blur(8px); border: 1px solid rgba(148,163,184,0.2); padding: 14px; border-radius: 12px; text-align: center; }
     .stButton>button { width: 100%; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; border-radius: 10px; }
     """,
@@ -107,6 +108,32 @@ THEME_STYLES = {
     .stButton>button { width: 100%; background-color: #374151; color: white; border: none; border-radius: 8px; }
     """,
 }
+
+
+def render_summary_box(summary_text: str):
+    """Render a modern, sleek dark card for the summary with crisp white text and no white banner."""
+    st.markdown(
+        f"""
+        <div style="
+            background: rgba(15, 23, 42, 0.92) !important;
+            backdrop-filter: blur(14px) !important;
+            -webkit-backdrop-filter: blur(14px) !important;
+            color: #f8fafc !important;
+            padding: 24px 28px !important;
+            border-radius: 14px !important;
+            border: 1px solid rgba(148, 163, 184, 0.3) !important;
+            border-left: 6px solid #38bdf8 !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+            font-size: 1.08rem !important;
+            line-height: 1.8 !important;
+            letter-spacing: 0.25px !important;
+            margin: 12px 0 24px 0 !important;
+        ">
+            {summary_text}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 def apply_theme_css(theme_name: str):
@@ -205,14 +232,231 @@ def generate_speech(text, language='en'):
     return text_to_speech(text, language)
 
 
+def _render_quality_gauge(score: float, coverage: float = 0.0, reduction: float = 0.0, readability: float = 0.0, novelty: float = 0.0):
+    """Render a premium, high-precision SVG Quality Score meter with full rating badge and 4-metric breakdown."""
+    import math
+
+    score = max(0.0, min(100.0, score))
+    cx, cy = 200, 155
+    r = 112
+    track_width = 15
+
+    # Tier definitions
+    if score < 40:
+        score_color = "#f43f5e"
+        status_label = "Low Quality"
+        status_bg = "rgba(244, 63, 94, 0.15)"
+        status_border = "rgba(244, 63, 94, 0.4)"
+        status_color = "#fb7185"
+    elif score < 70:
+        score_color = "#f59e0b"
+        status_label = "Moderate Quality"
+        status_bg = "rgba(245, 158, 11, 0.15)"
+        status_border = "rgba(245, 158, 11, 0.4)"
+        status_color = "#fbbf24"
+    else:
+        score_color = "#10b981"
+        status_label = "High Quality"
+        status_bg = "rgba(16, 185, 129, 0.15)"
+        status_border = "rgba(16, 185, 129, 0.4)"
+        status_color = "#34d399"
+
+    # Needle calculation
+    needle_angle = 180.0 - (score / 100.0) * 180.0
+    rad = math.radians(needle_angle)
+    needle_len = 76
+    tip_x = cx + needle_len * math.cos(rad)
+    tip_y = cy - needle_len * math.sin(rad)
+
+    # Base points
+    b1_rad = math.radians(needle_angle + 90)
+    b2_rad = math.radians(needle_angle - 90)
+    b_w = 4.2
+    b1_x = cx + b_w * math.cos(b1_rad)
+    b1_y = cy - b_w * math.sin(b1_rad)
+    b2_x = cx + b_w * math.cos(b2_rad)
+    b2_y = cy - b_w * math.sin(b2_rad)
+
+    def arc_path(start_deg, end_deg, radius):
+        s_rad = math.radians(start_deg)
+        e_rad = math.radians(end_deg)
+        x1 = cx + radius * math.cos(s_rad)
+        y1 = cy - radius * math.sin(s_rad)
+        x2 = cx + radius * math.cos(e_rad)
+        y2 = cy - radius * math.sin(e_rad)
+        return f"M {x1:.2f} {y1:.2f} A {radius} {radius} 0 0 1 {x2:.2f} {y2:.2f}"
+
+    low_arc = arc_path(180, 110, r)
+    mid_arc = arc_path(106, 56, r)
+    high_arc = arc_path(52, 0, r)
+    bg_arc = arc_path(180, 0, r)
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    overflow: hidden;
+  }}
+  .gauge-card {{
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.95));
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 20px;
+    padding: 16px 20px 18px 20px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+  }}
+  .title {{
+    font-size: 0.8rem;
+    font-weight: 750;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 2px;
+  }}
+  .badge {{
+    display: inline-block;
+    background: {status_bg};
+    border: 1px solid {status_border};
+    color: {status_color};
+    font-size: 0.88rem;
+    font-weight: 700;
+    padding: 4px 18px;
+    border-radius: 20px;
+    letter-spacing: 0.4px;
+    margin: 4px 0 12px 0;
+  }}
+  .breakdown-row {{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(148, 163, 184, 0.15);
+  }}
+  .breakdown-item {{
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 10px;
+    padding: 6px 4px;
+  }}
+  .b-label {{
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }}
+  .b-val {{
+    font-size: 0.95rem;
+    font-weight: 750;
+    color: #f8fafc;
+    margin-top: 2px;
+  }}
+</style>
+</head>
+<body>
+  <div class="gauge-card">
+    <div class="title">⚡ Summary Quality Index</div>
+    <svg viewBox="0 0 400 220" width="100%" style="overflow: visible; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));">
+      <defs>
+        <linearGradient id="lowGrad" x1="0%" y1="100%" x2="50%" y2="0%">
+          <stop offset="0%" stop-color="#e11d48"/>
+          <stop offset="100%" stop-color="#f43f5e"/>
+        </linearGradient>
+        <linearGradient id="midGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#fbbf24"/>
+        </linearGradient>
+        <linearGradient id="highGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#10b981"/>
+          <stop offset="100%" stop-color="#34d399"/>
+        </linearGradient>
+        <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+      </defs>
+
+      <!-- Background Track -->
+      <path d="{bg_arc}" fill="none" stroke="rgba(148, 163, 184, 0.12)" stroke-width="{track_width + 6}" stroke-linecap="round"/>
+
+      <!-- Three Colored Zones -->
+      <path d="{low_arc}" fill="none" stroke="url(#lowGrad)" stroke-width="{track_width}" stroke-linecap="round"/>
+      <path d="{mid_arc}" fill="none" stroke="url(#midGrad)" stroke-width="{track_width}" stroke-linecap="round"/>
+      <path d="{high_arc}" fill="none" stroke="url(#highGrad)" stroke-width="{track_width}" stroke-linecap="round"/>
+
+      <!-- Precision Tapered Needle -->
+      <polygon points="{tip_x:.2f},{tip_y:.2f} {b1_x:.2f},{b1_y:.2f} {b2_x:.2f},{b2_y:.2f}" 
+               fill="{score_color}" filter="url(#glowEffect)"/>
+
+      <!-- Center Hub Pivot -->
+      <circle cx="{cx}" cy="{cy}" r="15" fill="#0f172a" stroke="{score_color}" stroke-width="3" filter="url(#glowEffect)"/>
+      <circle cx="{cx}" cy="{cy}" r="6" fill="{score_color}"/>
+
+      <!-- Score Value -->
+      <text x="{cx}" y="104" text-anchor="middle" font-size="44" font-weight="800" fill="#ffffff" letter-spacing="-1px">
+        {score:.1f}
+      </text>
+      
+      <text x="{cx}" y="124" text-anchor="middle" font-size="12" font-weight="600" fill="#94a3b8" letter-spacing="0.8px">
+        OUT OF 100
+      </text>
+
+      <!-- Zone Endpoints -->
+      <text x="68" y="184" text-anchor="middle" font-size="11" font-weight="700" fill="#f43f5e">Low (0-40)</text>
+      <text x="{cx}" y="188" text-anchor="middle" font-size="11" font-weight="700" fill="#f59e0b">Medium (40-70)</text>
+      <text x="332" y="184" text-anchor="middle" font-size="11" font-weight="700" fill="#10b981">High (70-100)</text>
+    </svg>
+
+    <div>
+      <span class="badge">{status_label}</span>
+    </div>
+
+    <!-- 4 Drivers Breakdown Row (Shows what makes up the score) -->
+    <div class="breakdown-row">
+      <div class="breakdown-item">
+        <div class="b-label">Coverage</div>
+        <div class="b-val" style="color:#818cf8;">{coverage:.1f}%</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="b-label">Reduction</div>
+        <div class="b-val" style="color:#4ade80;">{reduction:.1f}%</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="b-label">Flesch</div>
+        <div class="b-val" style="color:#fbbf24;">{readability:.1f}</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="b-label">Novelty</div>
+        <div class="b-val" style="color:#f472b6;">{novelty:.1f}%</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>"""
+    components.html(html, height=390)
+
 def display_statistics(original_text, summary_text):
-    """Display summary statistics with comparative chart and reduction visual."""
-    import pandas as pd
+    """Display comprehensive summary statistics with the Quality Score Meter, counts, and 6 advanced metrics cards."""
+    from utils import BasicMetrics
 
-    original_words = len(original_text.split())
-    summary_words = len(summary_text.split())
-    compression = ((original_words - summary_words) / original_words * 100) if original_words > 0 else 0
+    if not original_text or not summary_text:
+        return
 
+    orig_words = max(1, len(original_text.split()))
+    summ_words = max(1, len(summary_text.split()))
+
+    # Basic counts
     summary_characters = len(summary_text)
     summary_sentences = len([s for s in re.split(r'[.!?]+', summary_text.strip()) if s.strip()])
     unique_words = len({
@@ -221,40 +465,109 @@ def display_statistics(original_text, summary_text):
         if w.strip(".,!?;:\"'()[]{}")
     })
 
-    # Detailed stats panel
-    with st.expander("📊 Summary Statistics", expanded=True):
-        stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
-        with stat_col1:
-            st.metric("Characters", f"{summary_characters:,}")
-        with stat_col2:
-            st.metric("Words", f"{summary_words:,}")
-        with stat_col3:
-            st.metric("Sentences", f"{summary_sentences:,}")
-        with stat_col4:
-            st.metric("Unique Words", f"{unique_words:,}")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Original Words", f"{original_words:,}")
-    with col2:
-        st.metric("Summary Words", f"{summary_words:,}")
-    with col3:
-        st.metric("Compression", f"{compression:.1f}%")
-    with col4:
-        st.metric("Reduction", f"{max(0, original_words - summary_words):,} words")
+    # The 6 Key Advanced Evaluation Metrics
+    compression_ratio = orig_words / summ_words
+    reduction_pct = max(0.0, min(100.0, (1 - (summ_words / orig_words)) * 100))
+    reduction_words = max(0, orig_words - summ_words)
+    coverage_pct = max(0.0, min(100.0, BasicMetrics.retention_ratio(original_text, summary_text) * 100))
+    novelty_pct = max(0.0, min(100.0, BasicMetrics.novelty_ratio(original_text, summary_text) * 100))
+    readability_score = _flesch_reading_ease(summary_text)
+    avg_sentence_length = BasicMetrics.avg_sentence_length(summary_text)
 
-    # Visual Comparison Graph
-    st.markdown("##### 📈 Original vs Summary Word Count")
-    chart_df = pd.DataFrame({
-        "Document Part": ["Original Text", "Summary"],
-        "Word Count": [original_words, summary_words]
-    })
-    st.bar_chart(chart_df.set_index("Document Part"), color="#3b82f6")
+    # Holistic Quality Score Calculation (0-100)
+    quality_score = (
+        0.35 * coverage_pct +
+        0.25 * max(0.0, min(100.0, reduction_pct)) +
+        0.25 * readability_score +
+        0.15 * (100 - novelty_pct)
+    )
+    quality_score = max(0.0, min(100.0, quality_score))
 
-    # Visual Reduction Progress Bar
-    reduction_ratio = max(0.0, min(100.0, compression))
-    st.markdown(f"**Document Reduction:** `{reduction_ratio:.1f}%` compressed")
-    st.progress(reduction_ratio / 100.0)
+    # Prominently Display the High-Precision Quality Meter
+    _render_quality_gauge(quality_score, coverage_pct, reduction_pct, readability_score, novelty_pct)
+
+    st.markdown("<div style='margin: 12px 0 8px 0;'></div>", unsafe_allow_html=True)
+
+    # Row 1: Structural Counts
+    r1_col1, r1_col2, r1_col3, r1_col4 = st.columns(4)
+    with r1_col1:
+        st.metric("Characters", f"{summary_characters:,}")
+    with r1_col2:
+        st.metric("Words", f"{summ_words:,}")
+    with r1_col3:
+        st.metric("Sentences", f"{summary_sentences:,}")
+    with r1_col4:
+        st.metric("Unique Words", f"{unique_words:,}")
+
+    # Row 2: Volume & Compression
+    r2_col1, r2_col2, r2_col3, r2_col4 = st.columns(4)
+    with r2_col1:
+        st.metric("Original Words", f"{orig_words:,}")
+    with r2_col2:
+        st.metric("Summary Words", f"{summ_words:,}")
+    with r2_col3:
+        st.metric("Compression", f"{reduction_pct:.1f}%")
+    with r2_col4:
+        st.metric("Reduction", f"{reduction_words:,} words")
+
+    st.markdown("<div style='margin: 16px 0 10px 0;'></div>", unsafe_allow_html=True)
+
+    # Row 3: Beautiful 6-Card Visual Metrics Grid
+    c1, c2, c3 = st.columns(3)
+
+    card_style = """
+        padding: 16px 18px; 
+        border-radius: 12px; 
+        background: rgba(30, 41, 59, 0.85); 
+        backdrop-filter: blur(8px); 
+        border: 1px solid rgba(148, 163, 184, 0.25); 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.18); 
+        margin-bottom: 12px;
+    """
+    label_style = "font-size: 0.82rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;"
+
+    with c1:
+        st.markdown(
+            f"""
+            <div style="{card_style}">
+                <div style="{label_style}">📊 Compression Ratio</div>
+                <div style="font-size: 1.75rem; font-weight: 800; color: #38bdf8; margin: 4px 0 12px 0;">{compression_ratio:.2f}x</div>
+                <div style="{label_style}">📉 Reduction</div>
+                <div style="font-size: 1.45rem; font-weight: 750; color: #4ade80; margin-top: 4px;">{reduction_pct:.1f}%</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with c2:
+        st.markdown(
+            f"""
+            <div style="{card_style}">
+                <div style="{label_style}">📖 Word Coverage</div>
+                <div style="font-size: 1.75rem; font-weight: 800; color: #818cf8; margin: 4px 0 12px 0;">{coverage_pct:.1f}%</div>
+                <div style="{label_style}">💡 Novelty Ratio</div>
+                <div style="font-size: 1.45rem; font-weight: 750; color: #f472b6; margin-top: 4px;">{novelty_pct:.1f}%</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with c3:
+        st.markdown(
+            f"""
+            <div style="{card_style}">
+                <div style="{label_style}">✏️ Flesch Score</div>
+                <div style="font-size: 1.75rem; font-weight: 800; color: #fbbf24; margin: 4px 0 12px 0;">{readability_score:.1f}</div>
+                <div style="{label_style}">📏 Avg Sentence Length</div>
+                <div style="font-size: 1.45rem; font-weight: 750; color: #a78bfa; margin-top: 4px;">{avg_sentence_length:.1f} words</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # Reduction Progress Bar
+    st.markdown(f"**Document Reduction:** `{reduction_pct:.1f}%` compressed")
+    st.progress(min(1.0, max(0.0, reduction_pct / 100.0)))
 
 
 def display_rouge_scores(summary_text, original_text):
@@ -388,153 +701,9 @@ def _flesch_reading_ease(text: str) -> float:
     return max(0.0, min(100.0, score))
 
 
-def _render_quality_gauge(score: float):
-    """Render a gauge-style fallback when Plotly is unavailable."""
-    score = max(0.0, min(100.0, score))
-    angle = 180 - (score / 100.0) * 180.0
-    import math
-
-    cx, cy, radius = 150, 150, 100
-    needle_x = cx + radius * math.cos(math.radians(angle))
-    needle_y = cy - radius * math.sin(math.radians(angle))
-
-    if score < 40:
-        score_color = "#ef4444"
-    elif score < 70:
-        score_color = "#f59e0b"
-    else:
-        score_color = "#22c55e"
-
-    svg = f"""
-    <div style="display:flex; justify-content:center; align-items:center; width:100%;">
-      <svg viewBox="0 0 300 190" width="100%" style="max-width:420px; height:auto; overflow:visible;">
-        <path d="M 50 150 A 100 100 0 0 1 250 150" fill="none" stroke="#e5e7eb" stroke-width="22" stroke-linecap="round"/>
-        <path d="M 50 150 A 100 100 0 0 1 130 63" fill="none" stroke="#ef4444" stroke-width="22" stroke-linecap="round"/>
-        <path d="M 130 63 A 100 100 0 0 1 200 63" fill="none" stroke="#f59e0b" stroke-width="22" stroke-linecap="round"/>
-        <path d="M 200 63 A 100 100 0 0 1 250 150" fill="none" stroke="#22c55e" stroke-width="22" stroke-linecap="round"/>
-        <line x1="150" y1="150" x2="{needle_x:.1f}" y2="{needle_y:.1f}" stroke="{score_color}" stroke-width="6" stroke-linecap="round"/>
-        <circle cx="150" cy="150" r="12" fill="{score_color}" stroke="#ffffff" stroke-width="4"/>
-        <text x="150" y="115" text-anchor="middle" font-size="34" font-weight="700" fill="#f8fafc">{score:.1f}</text>
-        <text x="150" y="138" text-anchor="middle" font-size="14" font-weight="600" fill="#94a3b8">Quality Score</text>
-        <text x="64" y="176" text-anchor="middle" font-size="12" font-weight="600" fill="#ef4444">Low</text>
-        <text x="150" y="176" text-anchor="middle" font-size="12" font-weight="600" fill="#f59e0b">Medium</text>
-        <text x="236" y="176" text-anchor="middle" font-size="12" font-weight="600" fill="#22c55e">High</text>
-      </svg>
-    </div>
-    """
-    st.markdown(svg, unsafe_allow_html=True)
-
-
 def display_evaluation_dashboard(original_text, summary_text, method_label="Extractive"):
-    """Display screenshot-style evaluation dashboard without touching model logic."""
-    try:
-        from utils import BasicMetrics
-
-        if not original_text or not summary_text:
-            return
-
-        orig_words = max(1, len(original_text.split()))
-        summ_words = max(1, len(summary_text.split()))
-
-        compression_ratio = orig_words / summ_words
-        reduction_pct = (1 - (summ_words / orig_words)) * 100
-        coverage_pct = BasicMetrics.retention_ratio(original_text, summary_text) * 100
-        novelty_pct = BasicMetrics.novelty_ratio(original_text, summary_text) * 100
-        readability_score = _flesch_reading_ease(summary_text)
-        avg_sentence_length = BasicMetrics.avg_sentence_length(summary_text)
-
-        # Quality score heuristic from intrinsic metrics
-        quality_score = (
-            0.35 * coverage_pct +
-            0.25 * max(0.0, min(100.0, reduction_pct)) +
-            0.25 * readability_score +
-            0.15 * (100 - novelty_pct)
-        )
-        quality_score = max(0.0, min(100.0, quality_score))
-
-        st.markdown("### 📉 Evaluation Results")
-
-        with st.expander(f"Evaluation: {method_label}", expanded=False):
-            # Gauge chart (with fallback if plotly unavailable)
-            try:
-                import plotly.graph_objects as go
-
-                fig = go.Figure(
-                    go.Indicator(
-                        mode="gauge+number",
-                        value=quality_score,
-                        number={"valueformat": ".1f"},
-                        title={"text": "Quality Score", "font": {"size": 28}},
-                        gauge={
-                            "axis": {"range": [0, 100], "tickwidth": 1},
-                            "bar": {"color": "#1f77b4"},
-                            "steps": [
-                                {"range": [0, 40], "color": "#f8cccc"},
-                                {"range": [40, 70], "color": "#f3efc2"},
-                                {"range": [70, 100], "color": "#c9f0c9"}
-                            ],
-                            "threshold": {
-                                "line": {"color": "red", "width": 6},
-                                "thickness": 0.75,
-                                "value": 70
-                            }
-                        }
-                    )
-                )
-                fig.update_layout(height=250, margin=dict(l=20, r=20, t=45, b=10))
-                st.plotly_chart(fig, use_container_width=True)
-            except Exception:
-                _render_quality_gauge(quality_score)
-
-            c1, c2, c3 = st.columns(3)
-
-            card_style = "padding: 14px 16px; border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 12px; background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0,0,0,0.15);"
-            label_style = "font-size: 0.85rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;"
-
-            with c1:
-                st.markdown("#### 📊 Compression")
-                st.markdown(
-                    f"""
-                    <div style="{card_style}">
-                        <div style="{label_style}">Compression Ratio</div>
-                        <div style="font-size: 1.7rem; font-weight: 800; color: #38bdf8; margin-bottom: 10px;">{compression_ratio:.2f}x</div>
-                        <div style="{label_style}">Reduction</div>
-                        <div style="font-size: 1.4rem; font-weight: 750; color: #4ade80;">{reduction_pct:.1f}%</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            with c2:
-                st.markdown("#### 📖 Coverage")
-                st.markdown(
-                    f"""
-                    <div style="{card_style}">
-                        <div style="{label_style}">Word Coverage</div>
-                        <div style="font-size: 1.7rem; font-weight: 800; color: #818cf8; margin-bottom: 10px;">{coverage_pct:.1f}%</div>
-                        <div style="{label_style}">Novelty Ratio</div>
-                        <div style="font-size: 1.4rem; font-weight: 750; color: #f472b6;">{novelty_pct:.1f}%</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            with c3:
-                st.markdown("#### ✏️ Readability")
-                st.markdown(
-                    f"""
-                    <div style="{card_style}">
-                        <div style="{label_style}">Flesch Score</div>
-                        <div style="font-size: 1.7rem; font-weight: 800; color: #fbbf24; margin-bottom: 10px;">{readability_score:.1f}</div>
-                        <div style="{label_style}">Avg Sentence Length</div>
-                        <div style="font-size: 1.4rem; font-weight: 750; color: #a78bfa;">{avg_sentence_length:.1f} words</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-    except Exception as e:
-        st.warning(f"Evaluation dashboard unavailable: {e}")
+    """Evaluation metrics are unified inside display_statistics (single meter only, no duplicate)."""
+    return
 
 
 def main():
@@ -1046,9 +1215,9 @@ def main():
                     advanced_time = time.time() - start_time
                 
                 st.subheader("📄 Summary (Advanced - All Algorithms)")
-                st.markdown(f'<div class="summary-box">{advanced_result["summary"]}</div>', unsafe_allow_html=True)
+                render_summary_box(advanced_result["summary"])
                 
-                with st.expander("📊 Statistics"):
+                with st.expander("📊 Statistics & Quality Meter", expanded=True):
                     display_statistics(input_text, advanced_result["summary"])
                     st.caption(f"⏱️ Generated in {advanced_time:.2f} seconds")
                 
@@ -1078,9 +1247,9 @@ def main():
                 
                 if method == "Extractive (TF-IDF)":
                     st.subheader("📄 Summary (TF-IDF)")
-                    st.markdown(f'<div class="summary-box">{tfidf_result["summary"]}</div>', unsafe_allow_html=True)
+                    render_summary_box(tfidf_result["summary"])
                     
-                    with st.expander("📊 Statistics"):
+                    with st.expander("📊 Statistics & Quality Meter", expanded=True):
                         display_statistics(input_text, tfidf_result["summary"])
                         st.caption(f"⏱️ Generated in {tfidf_time:.2f} seconds | Method: TF-IDF")
                     
@@ -1098,9 +1267,9 @@ def main():
                 
                 if method == "Extractive (TextRank)":
                     st.subheader("📄 Summary (TextRank)")
-                    st.markdown(f'<div class="summary-box">{textrank_result["summary"]}</div>', unsafe_allow_html=True)
+                    render_summary_box(textrank_result["summary"])
                     
-                    with st.expander("📊 Statistics"):
+                    with st.expander("📊 Statistics & Quality Meter", expanded=True):
                         display_statistics(input_text, textrank_result["summary"])
                         st.caption(f"⏱️ Generated in {textrank_time:.2f} seconds | Method: TextRank")
                     
@@ -1121,9 +1290,9 @@ def main():
                 
                 if method == "K-Means Clustering":
                     st.subheader("📄 Summary (K-Means Clustering)")
-                    st.markdown(f'<div class="summary-box">{kmeans_result["summary"]}</div>', unsafe_allow_html=True)
+                    render_summary_box(kmeans_result["summary"])
                     
-                    with st.expander("📊 Statistics"):
+                    with st.expander("📊 Statistics & Quality Meter", expanded=True):
                         display_statistics(input_text, kmeans_result["summary"])
                         st.caption(f"⏱️ Generated in {kmeans_time:.2f} seconds | Method: K-Means Clustering")
                     
@@ -1151,9 +1320,9 @@ def main():
                 
                 if method == "Semantic (SBERT)":
                     st.subheader("📄 Summary (SBERT Semantic)")
-                    st.markdown(f'<div class="summary-box">{sbert_result["summary"]}</div>', unsafe_allow_html=True)
+                    render_summary_box(sbert_result["summary"])
                     
-                    with st.expander("📊 Statistics"):
+                    with st.expander("📊 Statistics & Quality Meter", expanded=True):
                         display_statistics(input_text, sbert_result["summary"])
                         st.caption(f"⏱️ Generated in {sbert_time:.2f} seconds | Method: Sentence-BERT (MMR)")
                     
@@ -1180,9 +1349,9 @@ def main():
                 
                 if method == "Abstractive (AI)":
                     st.subheader("📄 Summary (AI Generated)")
-                    st.markdown(f'<div class="summary-box">{abstractive_result["summary"]}</div>', unsafe_allow_html=True)
+                    render_summary_box(abstractive_result["summary"])
                     
-                    with st.expander("📊 Statistics"):
+                    with st.expander("📊 Statistics & Quality Meter", expanded=True):
                         display_statistics(input_text, abstractive_result["summary"])
                         st.caption(f"⏱️ Generated in {abstractive_time:.2f} seconds | Model: {model_choice}")
                     

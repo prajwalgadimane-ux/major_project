@@ -201,19 +201,42 @@ class EmailOTPSender:
         self.sender_email = sender_email
         self.sender_password = sender_password
 
+    def _sync_env_credentials(self):
+        """Sync credentials directly from .env dynamically."""
+        from pathlib import Path
+        from dotenv import load_dotenv
+        env_file = Path(__file__).resolve().parent.parent / ".env"
+        load_dotenv(dotenv_path=env_file if env_file.exists() else None, override=True)
+        env_server = os.getenv("SMTP_SERVER")
+        env_port = os.getenv("SMTP_PORT")
+        env_email = os.getenv("SMTP_EMAIL")
+        env_pwd = os.getenv("SMTP_PASSWORD")
+        if env_server:
+            self.smtp_server = env_server
+        if env_port:
+            try:
+                self.smtp_port = int(env_port)
+            except ValueError:
+                pass
+        if env_email:
+            self.sender_email = env_email
+        if env_pwd:
+            self.sender_password = env_pwd
+
     def is_smtp_configured(self) -> bool:
         """Check if SMTP credentials are configured with non-dummy values."""
+        self._sync_env_credentials()
         return bool(
             self.smtp_server
             and self.sender_email
             and self.sender_password
-            and self.sender_password not in ("", "your-app-password")
-            and self.sender_email != "your-email@gmail.com"
+            and self.sender_password.strip() not in ("", "your-app-password")
+            and self.sender_email.strip() != "your-email@gmail.com"
         )
     
     def send_otp_email(self, recipient_email: str, otp: str, expiry_minutes: int = 5) -> Tuple[bool, str]:
         """
-        Send OTP via email. Supports automatic local fallback in dev/demo mode.
+        Send OTP via email using SMTP.
         
         Args:
             recipient_email: Recipient's email address
@@ -224,12 +247,10 @@ class EmailOTPSender:
             Tuple of (success, message)
         """
         recipient_email = recipient_email.strip()
-        allow_dev = os.getenv("ALLOW_DEV_OTP", "True").lower() in ("true", "1", "yes")
+        self._sync_env_credentials()
 
         if not self.is_smtp_configured():
-            if allow_dev:
-                return True, f"[DEV_MODE] OTP generated: {otp}"
-            return False, "Email service not configured. Set SMTP_EMAIL and SMTP_PASSWORD in .env."
+            return False, "Email service not configured. Please set SMTP_EMAIL and SMTP_PASSWORD in .env."
         
         try:
             # Create email message
@@ -278,30 +299,30 @@ class EmailOTPSender:
             msg.attach(MIMEText(text_content, 'plain'))
             msg.attach(MIMEText(html_content, 'html'))
             
+            clean_password = self.sender_password.strip()
+            
             # Send email
             with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=15) as server:
                 server.starttls()
-                server.login(self.sender_email, self.sender_password)
+                try:
+                    server.login(self.sender_email, clean_password)
+                except smtplib.SMTPAuthenticationError:
+                    if " " in clean_password:
+                        server.login(self.sender_email, clean_password.replace(" ", ""))
+                    else:
+                        raise
                 server.send_message(msg)
             
             return True, f"OTP sent to {recipient_email}"
             
         except smtplib.SMTPAuthenticationError:
-            if allow_dev:
-                return True, f"[DEV_MODE] (SMTP auth failed) OTP generated: {otp}"
-            return False, "Email authentication failed. Check credentials."
+            return False, "Email authentication failed. Please verify your Gmail App Password."
         except smtplib.SMTPException as e:
-            if allow_dev:
-                return True, f"[DEV_MODE] (SMTP error) OTP generated: {otp}"
-            return False, f"Failed to send email: {str(e)}"
+            return False, f"SMTP error sending email: {str(e)}"
         except OSError as e:
-            if allow_dev:
-                return True, f"[DEV_MODE] (Network error) OTP generated: {otp}"
             return False, f"Network error: {str(e)}. Check internet connection."
         except Exception as e:
-            if allow_dev:
-                return True, f"[DEV_MODE] OTP generated: {otp}"
-            return False, f"Error: {str(e)}"
+            return False, f"Error sending OTP: {str(e)}"
 
 
 def format_time_remaining(seconds: int) -> str:
