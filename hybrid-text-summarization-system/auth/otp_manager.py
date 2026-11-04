@@ -11,6 +11,7 @@ import string
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Tuple
 from dataclasses import dataclass
@@ -185,7 +186,8 @@ class EmailOTPSender:
         smtp_server: str,
         smtp_port: int = 587,
         sender_email: str = "",
-        sender_password: str = ""
+        sender_password: str = "",
+        sender_name: str = "Summarx AI"
     ):
         """
         Initialize email sender.
@@ -200,6 +202,7 @@ class EmailOTPSender:
         self.smtp_port = smtp_port
         self.sender_email = sender_email
         self.sender_password = sender_password
+        self.sender_name = sender_name
 
     def _sync_env_credentials(self):
         """Sync credentials directly from .env dynamically."""
@@ -222,6 +225,9 @@ class EmailOTPSender:
             self.sender_email = env_email
         if env_pwd:
             self.sender_password = env_pwd
+        env_name = os.getenv("SMTP_SENDER_NAME") or os.getenv("APP_NAME")
+        if env_name:
+            self.sender_name = env_name
 
     def is_smtp_configured(self) -> bool:
         """Check if SMTP credentials are configured with non-dummy values."""
@@ -254,9 +260,10 @@ class EmailOTPSender:
         
         try:
             # Create email message
+            display_name = getattr(self, "sender_name", None) or os.getenv("SMTP_SENDER_NAME") or os.getenv("APP_NAME") or "Summarx AI"
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = '🔐 Your Text Summarizer Login OTP'
-            msg['From'] = self.sender_email
+            msg['Subject'] = f'🔐 Your {display_name} Login OTP'
+            msg['From'] = formataddr((display_name, self.sender_email))
             msg['To'] = recipient_email
             
             # HTML email content
@@ -280,7 +287,7 @@ class EmailOTPSender:
                 <div class="container">
                     <div class="header">
                         <div class="logo">📝</div>
-                        <div class="title">Text Summarizer</div>
+                        <div class="title">{display_name}</div>
                     </div>
                     <p style="text-align: center; color: #333;">Your One-Time Password for login:</p>
                     <div class="otp-box">{otp}</div>
@@ -294,7 +301,7 @@ class EmailOTPSender:
             </html>
             """
             
-            text_content = f"Your Text Summarizer OTP is: {otp}\nValid for {expiry_minutes} minutes.\nDo not share this OTP."
+            text_content = f"Your {display_name} OTP is: {otp}\nValid for {expiry_minutes} minutes.\nDo not share this OTP."
             
             msg.attach(MIMEText(text_content, 'plain'))
             msg.attach(MIMEText(html_content, 'html'))
