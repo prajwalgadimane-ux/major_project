@@ -298,25 +298,21 @@ class EmailOTPSender:
             
             msg.attach(MIMEText(text_content, 'plain'))
             msg.attach(MIMEText(html_content, 'html'))
-            
-            clean_password = self.sender_password.strip()
+            clean_email = self.sender_email.strip()
+            clean_password = self.sender_password.strip().replace(" ", "")
             
             # Send email
             with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=15) as server:
                 server.starttls()
-                try:
-                    server.login(self.sender_email, clean_password)
-                except smtplib.SMTPAuthenticationError:
-                    if " " in clean_password:
-                        server.login(self.sender_email, clean_password.replace(" ", ""))
-                    else:
-                        raise
+                server.login(clean_email, clean_password)
                 server.send_message(msg)
             
             return True, f"OTP sent to {recipient_email}"
             
         except smtplib.SMTPAuthenticationError:
-            return False, "Email authentication failed. Please verify your Gmail App Password."
+            return False, "Gmail authentication failed (Bad Credentials). Please check your 16-character App Password at myaccount.google.com/apppasswords."
+        except smtplib.SMTPServerDisconnected:
+            return False, "Gmail rejected the credentials or disconnected. Please check your App Password or 2-Step Verification."
         except smtplib.SMTPException as e:
             return False, f"SMTP error sending email: {str(e)}"
         except OSError as e:
